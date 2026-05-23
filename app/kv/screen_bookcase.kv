@@ -1,0 +1,55 @@
+<BookcaseScreen>
+    name: 'bookcase'
+    BoxLayout:
+        orientation: 'vertical'
+
+        BoxLayout:
+            size_hint_y: None
+            height: '56dp'
+            padding: ['12dp', '8dp']
+            spacing: '8dp'
+            canvas.before:
+                Color:
+                    rgba: (0.2, 0.6, 0.8, 1)
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            Label:
+                text: '我的书架'
+                font_size: '20sp'
+                color: (1, 1, 1, 1)
+                size_hint_x: 0.7
+                halign: 'left'
+                valign: 'middle'
+
+            Button:
+                text: '搜索'
+                size_hint_x: 0.3
+                background_color: (1, 1, 1, 0.2)
+                color: (1, 1, 1, 1)
+                on_press: root.go_search()
+
+        BoxLayout:
+            size_hint_y: None
+            height: '40dp'
+            padding: ['12dp', 0]
+
+            Label:
+                id: status_label
+                text: root.loading if root.loading else ('' if root.books else '书架是空的')
+                font_size: '14sp'
+                color: (0.6, 0.6, 0.6, 1)
+                halign: 'center'
+                valign: 'middle'
+
+        ScrollView:
+            do_scroll_x: False
+
+            GridLayout:
+                id: books_grid
+                cols: 1
+                spacing: '2dp'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: ['8dp', 0]

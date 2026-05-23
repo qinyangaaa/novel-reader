@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: 小说爬虫",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/novel_crawler/main.py",
+            "console": "integratedTerminal",
+            "python": "${env:CONDA_PREFIX}\\python.exe",
+            "justMyCode": true
+        }
+    ]
+}

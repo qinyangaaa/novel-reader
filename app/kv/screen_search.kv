@@ -1,0 +1,63 @@
+<SearchScreen>
+    name: 'search'
+    BoxLayout:
+        orientation: 'vertical'
+
+        BoxLayout:
+            size_hint_y: None
+            height: '56dp'
+            padding: ['8dp', '8dp']
+            spacing: '8dp'
+            canvas.before:
+                Color:
+                    rgba: (0.2, 0.6, 0.8, 1)
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+            Button:
+                text: '<'
+                size_hint_x: 0.12
+                background_color: (1, 1, 1, 0.2)
+                color: (1, 1, 1, 1)
+                font_size: '20sp'
+                on_press: root.go_back()
+
+            TextInput:
+                id: search_input
+                size_hint_x: 0.6
+                hint_text: '输入书名'
+                multiline: False
+                font_size: '16sp'
+                on_text_validate: root.do_search()
+
+            Button:
+                text: '搜索'
+                size_hint_x: 0.28
+                background_color: (1, 1, 1, 0.2)
+                color: (1, 1, 1, 1)
+                on_press: root.do_search()
+
+        BoxLayout:
+            size_hint_y: None
+            height: '36dp'
+            padding: ['12dp', 0]
+
+            Label:
+                id: status_label
+                text: root.loading
+                font_size: '14sp'
+                color: (0.6, 0.6, 0.6, 1)
+                halign: 'center'
+                valign: 'middle'
+
+        ScrollView:
+            do_scroll_x: False
+
+            GridLayout:
+                id: results_grid
+                cols: 1
+                spacing: '2dp'
+                size_hint_y: None
+                height: self.minimum_height
+                padding: ['8dp', 0]

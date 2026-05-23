@@ -1,0 +1,63 @@
+<ReaderScreen>
+    name: 'reader'
+    BoxLayout:
+        orientation: 'vertical'
+
+        BoxLayout:
+            size_hint_y: 0.08
+            padding: [10, 5]
+            spacing: 10
+
+            Button:
+                text: '< 返回'
+                size_hint_x: 0.2
+                background_color: (0.6, 0.6, 0.6, 1)
+                color: (1, 1, 1, 1)
+                on_press: root.go_back()
+
+            Label:
+                id: chapter_title
+                text: '章节标题'
+                size_hint_x: 0.8
+                font_size: '16sp'
+                bold: True
+                color: (0.1, 0.1, 0.1, 1)
+
+        ScrollView:
+            size_hint_y: 0.84
+            do_scroll_x: False
+
+            Label:
+                id: chapter_content
+                text: '加载中...'
+                font_size: '17sp'
+                color: (0.15, 0.15, 0.15, 1)
+                padding: [15, 15]
+                text_size: self.width, None
+                size_hint_y: None
+                height: self.texture_size[1]
+                valign: 'top'
+                halign: 'left'
+
+        BoxLayout:
+            size_hint_y: 0.08
+            padding: [10, 5]
+            spacing: 10
+
+            Button:
+                text: '上一章'
+                size_hint_x: 0.3
+                background_color: (0.4, 0.4, 0.4, 1)
+                color: (1, 1, 1, 1)
+
+            Label:
+                id: index_label
+                text: ''
+                size_hint_x: 0.4
+                color: (0.3, 0.3, 0.3, 1)
+
+            Button:
+                text: '下一章'
+                size_hint_x: 0.3
+                background_color: (0.2, 0.6, 0.8, 1)
+                color: (1, 1, 1, 1)

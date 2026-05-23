@@ -1,0 +1,28 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>信息提示</title>
+<link href="https://www.shuzhaige.com/e/message/images/mes.css" rel="stylesheet" type="text/css">
+<SCRIPT language=javascript>
+var secs=3;//3秒
+for(i=1;i<=secs;i++) 
+{ window.setTimeout("update(" + i + ")", i * 1000);} 
+function update(num) 
+{ 
+if(num == secs) 
+{ history.go(-1); } 
+else 
+{ } 
+}
+</SCRIPT>
+</head>
+
+<body>
+	<div class="tip">
+    	<div class="closebox"><a href="javascript:history.go(-1)" title="点击关闭并跳转"></a></div>
+    	<div class="message">没有搜索到相关的内容<a href="javascript:history.go(-1)">如果您的浏览器没有自动跳转,请点击跳转......</a></div>
+        <div class="otherlink"><div class="fr"><a href="javascript:history.go(-1);" class="return">返回上页</a> <a href="javascript:history.go(-1)" class="next">快速跳转</a></div>快捷操作: <a href="/" class="index">返回首页</a> <a href="/" class="error" target="_blank">错误提交</a></div>
+    </div>
+</body>
+</html>

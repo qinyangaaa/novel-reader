@@ -1,0 +1,12 @@
+cd novel_crawler
+
+git init
+git add .
+git commit -m "Initial commit - Novel Reader Kivy App"
+
+# 去 https://github.com 新建一个仓库（不要勾选任何初始化选项）
+# 仓库名随便，比如 novel-reader
+
+git remote add origin https://github.com/你的用户名/novel-reader.git
+git push -u origin master
+

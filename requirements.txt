@@ -1,0 +1,16 @@
+# 小说爬虫 APP 依赖库
+
+# HTTP 请求库 - 用于发送网络请求、爬取网页
+requests>=2.31.0
+
+# HTML 解析库 - 用于解析网页结构、提取数据
+beautifulsoup4>=4.12.0
+
+# HTML 解析器 - BeautifulSoup 的解析引擎
+lxml>=5.1.0
+
+# ORM 框架 - 用于操作 SQLite 数据库
+sqlalchemy>=2.0.0
+
+# 可选：URL 解析与规范化（requests 自带，显式声明版本）
+urllib3>=2.0.0
