@@ -12,8 +12,6 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,otf
 
 # 版本
 version = 0.1
-version.regex = __version__ = ['"](.*)['"]
-version.filename = %(source.dir)s/main.py
 
 # 需求库
 requirements = python3,kivy==2.3.1,requests,beautifulsoup4,sqlalchemy
@@ -30,7 +28,7 @@ android.gradle_dependencies = 'androidx.core:core:1.7.0'
 android.enable_androidx = True
 
 # 图标
-android.icon = app/icon.png
+# android.icon = app/icon.png
 
 # 打包格式
 android.archs = arm64-v8a
