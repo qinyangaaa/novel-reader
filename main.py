@@ -7,3 +7,4 @@ from app.main import NovelReaderApp
 
 if __name__ == '__main__':
     NovelReaderApp().run()
+
