@@ -9,7 +9,7 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,otf
 
 version = 0.1
 
-requirements = python3==3.11.11,kivy,requests,beautifulsoup4,sqlalchemy
+requirements = python3,kivy,requests,beautifulsoup4,sqlalchemy
 
 android.permissions = INTERNET
 
