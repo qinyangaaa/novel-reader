@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="小说">
+  <meta name="theme-color" content="#2c2416">
+
+  <title>{% block title %}小说阅读器{% endblock %}</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+
+  <!-- 字体（可离线后回退系统字体） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@400;600;700&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
+
+  <link rel="stylesheet" href="/static/css/main.css">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+  <!-- ── 顶部导航 ─────────────────────────────────────── -->
+  {% block navbar %}
+  <nav class="navbar">
+    {% block navbar_left %}
+    <a href="/" class="navbar-brand">📚 小说阅读器</a>
+    {% endblock %}
+    {% block navbar_right %}
+    <button class="navbar-btn" onclick="window.location='/search'" title="搜索">🔍</button>
+    <button class="navbar-btn" id="themeToggle" onclick="toggleTheme()" title="切换主题">🌙</button>
+    {% endblock %}
+  </nav>
+  {% endblock %}
+
+  <!-- ── 主内容 ──────────────────────────────────────── -->
+  <main id="mainContent" style="padding-bottom:64px;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- ── 底部 Tab 导航（阅读页自行隐藏）────────────────── -->
+  {% block bottom_nav %}
+  <nav class="bottom-tab-bar" id="bottomTabBar">
+    <a class="tab-item {% if request.url.path == '/' %}active{% endif %}" href="/">
+      <span class="tab-icon">🏠</span>
+      <span class="tab-label">主页</span>
+    </a>
+    <a class="tab-item {% if request.url.path.startswith('/shelf') %}active{% endif %}" href="/shelf">
+      <span class="tab-icon">📚</span>
+      <span class="tab-label">书架</span>
+    </a>
+    <a class="tab-item {% if request.url.path.startswith('/search') %}active{% endif %}" href="/search">
+      <span class="tab-icon">🔍</span>
+      <span class="tab-label">搜索</span>
+    </a>
+    <a class="tab-item {% if request.url.path.startswith('/history') %}active{% endif %}" href="/history">
+      <span class="tab-icon">🕐</span>
+      <span class="tab-label">历史</span>
+    </a>
+    <a class="tab-item {% if request.url.path.startswith('/downloads') %}active{% endif %}" href="/downloads">
+      <span class="tab-icon">📥</span>
+      <span class="tab-label">下载</span>
+    </a>
+  </nav>
+  {% endblock %}
+
+  <!-- ── Toast ───────────────────────────────────────── -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ── PWA 安装横幅 ────────────────────────────────── -->
+  <div class="pwa-banner" id="pwaBanner">
+    <span class="pwa-banner-text">📱 添加到主屏幕，像 App 一样打开</span>
+    <button class="pwa-install-btn" id="pwaInstallBtn">添加</button>
+    <button class="pwa-dismiss" onclick="dismissPwa()">✕</button>
+  </div>
+
+  <script>
+    // ── 主题 ────────────────────────────────────────────
+    const THEME_KEY = "novel_theme";
+    function applyTheme(t) {
+      document.documentElement.setAttribute("data-theme", t);
+      const btn = document.getElementById("themeToggle");
+      if (btn) btn.textContent = t === "dark" ? "☀️" : "🌙";
+    }
+    function toggleTheme() {
+      const cur  = document.documentElement.getAttribute("data-theme") || "light";
+      const next = cur === "dark" ? "light" : "dark";
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+    }
+    applyTheme(localStorage.getItem(THEME_KEY) || "light");
+
+    // ── Toast ───────────────────────────────────────────
+    function showToast(msg, ms = 2200) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      clearTimeout(t._tid);
+      t._tid = setTimeout(() => t.classList.remove("show"), ms);
+    }
+
+    // ── Service Worker 注册 ─────────────────────────────
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/static/js/sw.js", { scope: "/" })
+          .catch(e => console.warn("[SW] 注册失败:", e));
+      });
+    }
+
+    // ── PWA 安装提示 ────────────────────────────────────
+    let _deferredPrompt = null;
+    window.addEventListener("beforeinstallprompt", e => {
+      e.preventDefault();
+      _deferredPrompt = e;
+      // 只有第一次才弹，用户驳回后不再显示
+      if (!localStorage.getItem("pwa_dismissed")) {
+        document.getElementById("pwaBanner").classList.add("show");
+      }
+    });
+    document.getElementById("pwaInstallBtn")?.addEventListener("click", async () => {
+      if (!_deferredPrompt) return;
+      _deferredPrompt.prompt();
+      const { outcome } = await _deferredPrompt.userChoice;
+      _deferredPrompt = null;
+      document.getElementById("pwaBanner").classList.remove("show");
+      if (outcome === "accepted") showToast("已添加到主屏幕 🎉");
+    });
+    function dismissPwa() {
+      localStorage.setItem("pwa_dismissed", "1");
+      document.getElementById("pwaBanner").classList.remove("show");
+    }
+  </script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

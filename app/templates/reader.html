@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+{% block title %}{{ chapter.title }} - {{ book.title }}{% endblock %}
+
+{# ── 导航栏：书名 + 目录 + 设置 ── #}
+{% block navbar %}
+<nav class="navbar">
+  <button class="navbar-btn"
+    onclick="window.location='/book?source={{ source }}&url={{ book.source_url|urlencode }}'">←</button>
+  <span class="navbar-brand" style="font-size:0.88rem;flex:1;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">
+    {{ book.title|truncate(16,true,'…') }}
+  </span>
+  <button class="navbar-btn" onclick="openToc()"     title="目录">☰</button>
+  <button class="navbar-btn" onclick="openSettings()" title="设置">⚙️</button>
+</nav>
+{% endblock %}
+
+{% block bottom_nav %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  body { background: var(--bg); overflow-x: hidden; }
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── 顶部进度条 ── #}
+<div class="read-progress-bar" id="progressBar"></div>
+
+{# ── 正文区 ── #}
+<div class="reader-body" id="readerBody">
+
+  {# 章节标题 + 进度 #}
+  <div class="reader-chapter-title">{{ chapter.title }}</div>
+  <div class="progress-label" id="progressLabel">
+    第 {{ chapter.idx + 1 }} 章 / 共 {{ total_chapters }} 章 · {{ progress }}%
+  </div>
+
+  {# 正文段落 #}
+  <div class="reader-content" id="readerContent">
+    {% for para in content.split('\n\n') %}
+      {% if para.strip() %}<p>{{ para.strip() }}</p>{% endif %}
+    {% endfor %}
+  </div>
+
+  {# 底部区域 #}
+  <div style="text-align:center;padding:32px 0 12px;color:var(--text-muted);font-size:0.85rem;">
+    {% if next_chapter %}
+      <div id="autoNextHint">— 继续下滑加载下一章 —</div>
+    {% else %}
+      <div style="font-size:1rem;padding:8px 0;">🎉 全书完结</div>
+      <div style="font-size:0.82rem;margin-top:6px;">
+        <a href="/book?source={{ source }}&url={{ book.source_url|urlencode }}"
+           style="color:var(--accent);">返回目录</a>
+      </div>
+    {% endif %}
+  </div>
+
+</div><!-- /reader-body -->
+
+{# ── 底部导航（4 按钮）── #}
+<div class="reader-nav-v2">
+  <button class="rnav-btn" id="prevBtn"
+    {% if not prev_chapter %}disabled{% endif %}
+    onclick="navTo('{{ prev_chapter.id if prev_chapter else '' }}')">
+    <span class="rnav-icon">‹</span> 上章
+  </button>
+
+  <button class="rnav-btn" onclick="openToc()">
+    <span class="rnav-icon">☰</span> 目录
+  </button>
+
+  {% if on_shelf %}
+  <button class="rnav-btn shelf-btn on-shelf" id="shelfBtn"
+    onclick="toggleShelf({{ book.id }}, false)">
+    ★ 已收藏
+  </button>
+  {% else %}
+  <button class="rnav-btn shelf-btn" id="shelfBtn"
+    onclick="toggleShelf({{ book.id }}, true)">
+    ☆ 收藏
+  </button>
+  {% endif %}
+
+  <button class="rnav-btn primary" id="nextBtn"
+    {% if not next_chapter %}disabled{% endif %}
+    onclick="navTo('{{ next_chapter.id if next_chapter else '' }}')">
+    下章 <span class="rnav-icon">›</span>
+  </button>
+</div>
+
+{# ── 预加载状态点 ── #}
+<div class="prefetch-dot" id="prefetchDot"></div>
+
+{# ── 目录浮窗 ── #}
+<div class="overlay" id="tocOverlay" onclick="closeToc()"></div>
+<div class="toc-panel" id="tocPanel">
+  <div class="toc-header">
+    <span class="toc-header-title">{{ book.title }}</span>
+    <button class="toc-close" onclick="closeToc()">✕</button>
+  </div>
+  <div class="toc-search">
+    <input type="search" id="tocSearchInput" placeholder="搜索章节…"
+           oninput="filterToc(this.value)" autocomplete="off">
+  </div>
+  <div class="toc-list" id="tocList">
+    <div style="text-align:center;padding:30px;color:var(--text-muted);font-size:0.85rem;">
+      加载中…
+    </div>
+  </div>
+</div>
+
+{# ── 阅读设置面板 ── #}
+<div class="overlay" id="settingsOverlay" onclick="closeSettings()"></div>
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-title">阅读设置</div>
+
+  <div class="settings-row">
+    <span class="settings-label">字体大小</span>
+    <div class="settings-controls">
+      <button class="ctrl-btn" onclick="changeFontSize(-1)">A−</button>
+      <span class="ctrl-value" id="fontSizeVal">18</span>
+      <button class="ctrl-btn" onclick="changeFontSize(1)">A+</button>
+    </div>
+  </div>
+
+  <div class="settings-row">
+    <span class="settings-label">行距</span>
+    <div class="settings-controls">
+      <button class="ctrl-btn" onclick="changeLineHeight(-0.1)">−</button>
+      <span class="ctrl-value" id="lineHeightVal">1.9</span>
+      <button class="ctrl-btn" onclick="changeLineHeight(0.1)">+</button>
+    </div>
+  </div>
+
+  <div class="settings-divider"></div>
+
+  <div class="settings-row">
+    <span class="settings-label">主题</span>
+    <div class="theme-btns">
+      <button class="theme-btn" id="themeLight" onclick="setTheme('light')">白天</button>
+      <button class="theme-btn" id="themeDark"  onclick="setTheme('dark')">夜间</button>
+      <button class="theme-btn" id="themeSepia" onclick="setTheme('sepia')">护眼</button>
+    </div>
+  </div>
+
+  <div class="settings-divider"></div>
+
+  <div class="settings-row" style="justify-content:center;gap:12px;flex-wrap:wrap;">
+    {% if prev_chapter %}
+    <button class="nav-btn" style="flex:none;padding:0 18px;"
+      onclick="navTo('{{ prev_chapter.id }}');closeSettings()">← 上一章</button>
+    {% endif %}
+    {% if next_chapter %}
+    <button class="nav-btn nav-btn-primary" style="flex:none;padding:0 18px;"
+      onclick="navTo('{{ next_chapter.id }}');closeSettings()">下一章 →</button>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ════════════════════════════════════════════════════════
+// 常量（Jinja2 注入）
+// ════════════════════════════════════════════════════════
+const BOOK_ID      = {{ book.id }};
+const CHAPTER_ID   = {{ chapter.id }};
+const CHAPTER_IDX  = {{ chapter.idx }};
+const SOURCE       = "{{ source }}";
+const BOOK_URL_ENC = "{{ book.source_url|urlencode }}";
+{% if next_chapter %}
+const NEXT_ID      = {{ next_chapter.id }};
+const NEXT_URL     = "/read/{{ next_chapter.id }}";
+{% else %}
+const NEXT_ID      = null;
+const NEXT_URL     = null;
+{% endif %}
+{% if prev_chapter %}
+const PREV_ID      = {{ prev_chapter.id }};
+{% else %}
+const PREV_ID      = null;
+{% endif %}
+
+const SETTINGS_KEY = "novel_settings";
+
+// ════════════════════════════════════════════════════════
+// 设置（字体/行距/主题）
+// ════════════════════════════════════════════════════════
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveSettings(s) {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+function applyReaderSettings(s) {
+  const c = document.getElementById("readerContent");
+  if (!c) return;
+  c.style.fontSize   = (s.fontSize   || 18) + "px";
+  c.style.lineHeight = (s.lineHeight || 1.9);
+  document.getElementById("fontSizeVal").textContent   = s.fontSize   || 18;
+  document.getElementById("lineHeightVal").textContent = (s.lineHeight || 1.9).toFixed(1);
+}
+function changeFontSize(d) {
+  const s = loadSettings();
+  s.fontSize = Math.min(28, Math.max(14, (s.fontSize || 18) + d));
+  saveSettings(s); applyReaderSettings(s);
+}
+function changeLineHeight(d) {
+  const s = loadSettings();
+  s.lineHeight = Math.min(3.0, Math.max(1.2,
+    parseFloat(((s.lineHeight || 1.9) + d).toFixed(1))));
+  saveSettings(s); applyReaderSettings(s);
+}
+
+// 主题
+function setTheme(theme) {
+  const s = loadSettings(); s.theme = theme;
+  saveSettings(s); _applyTheme(theme);
+}
+function _applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === "sepia") {
+    root.setAttribute("data-theme", "light");
+    root.style.setProperty("--bg",      "#f4ead0");
+    root.style.setProperty("--bg-card", "#f9f3e3");
+    root.style.setProperty("--text",    "#3e2c1a");
+  } else {
+    root.removeAttribute("style");
+    root.setAttribute("data-theme", theme);
+  }
+  const tog = document.getElementById("themeToggle");
+  if (tog) tog.textContent = theme === "dark" ? "☀️" : "🌙";
+  ["light","dark","sepia"].forEach(t => {
+    document.getElementById("theme" + t[0].toUpperCase() + t.slice(1))
+      ?.classList.toggle("active", t === theme);
+  });
+}
+// 覆盖 base.html
+function toggleTheme() {
+  const s = loadSettings();
+  const list = ["light","dark","sepia"];
+  setTheme(list[(list.indexOf(s.theme||"light")+1) % list.length]);
+}
+
+// ════════════════════════════════════════════════════════
+// 面板开关
+// ════════════════════════════════════════════════════════
+function openSettings() {
+  closeAllPanels();
+  document.getElementById("settingsPanel").classList.add("open");
+  document.getElementById("settingsOverlay").classList.add("open");
+}
+function closeSettings() {
+  document.getElementById("settingsPanel").classList.remove("open");
+  document.getElementById("settingsOverlay").classList.remove("open");
+}
+function openToc() {
+  closeAllPanels();
+  document.getElementById("tocPanel").classList.add("open");
+  document.getElementById("tocOverlay").classList.add("open");
+  loadToc();
+}
+function closeToc() {
+  document.getElementById("tocPanel").classList.remove("open");
+  document.getElementById("tocOverlay").classList.remove("open");
+}
+function closeAllPanels() {
+  closeSettings(); closeToc();
+}
+
+// ════════════════════════════════════════════════════════
+// 目录浮窗
+// ════════════════════════════════════════════════════════
+let tocLoaded = false;
+let tocData   = [];   // [{id, idx, title}]
+
+async function loadToc() {
+  if (tocLoaded) { scrollTocToCurrent(); return; }
+  try {
+    const res = await fetch(`/api/toc/${BOOK_ID}`);
+    if (!res.ok) throw new Error(res.status);
+    tocData = await res.json();
+    renderToc(tocData);
+    tocLoaded = true;
+    scrollTocToCurrent();
+  } catch(e) {
+    document.getElementById("tocList").innerHTML =
+      `<div style="padding:20px;text-align:center;color:var(--text-muted);">目录加载失败</div>`;
+  }
+}
+
+function renderToc(chapters) {
+  const list = document.getElementById("tocList");
+  list.innerHTML = chapters.map(c => `
+    <a class="toc-item ${c.id === CHAPTER_ID ? 'toc-current' : ''}"
+       href="/read/${c.id}" data-title="${c.title.toLowerCase()}">
+      <span class="toc-item-num">${c.idx + 1}</span>${escHtml(c.title)}
+    </a>`).join("");
+}
+
+function scrollTocToCurrent() {
+  const cur = document.querySelector(".toc-current");
+  if (cur) cur.scrollIntoView({ block:"center", behavior:"smooth" });
+}
+
+function filterToc(q) {
+  q = q.trim().toLowerCase();
+  if (!q) { renderToc(tocData); return; }
+  renderToc(tocData.filter(c => c.title.toLowerCase().includes(q)));
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ════════════════════════════════════════════════════════
+// 阅读进度条（滚动驱动）
+// ════════════════════════════════════════════════════════
+function updateProgressBar() {
+  const body  = document.getElementById("readerBody");
+  const h     = body ? body.scrollHeight : document.documentElement.scrollHeight;
+  const pct   = Math.min(100, (window.scrollY + window.innerHeight) / h * 100);
+  document.getElementById("progressBar").style.width = pct + "%";
+}
+window.addEventListener("scroll", updateProgressBar, { passive: true });
+
+// ════════════════════════════════════════════════════════
+// 预加载下一章
+// ════════════════════════════════════════════════════════
+let prefetchDone = false;
+async function prefetchNext() {
+  if (!NEXT_ID || prefetchDone) return;
+  const dot = document.getElementById("prefetchDot");
+  dot.classList.add("loading");
+  try {
+    const r = await fetch(`/api/prefetch/${NEXT_ID}`);
+    const d = await r.json();
+    prefetchDone = true;
+    dot.classList.remove("loading");
+    if (d.status === "ok" || d.status === "cached") {
+      dot.classList.add("done");
+      setTimeout(() => dot.classList.remove("done"), 3000);
+    }
+  } catch {
+    dot.classList.remove("loading");
+  }
+}
+// 读 30% 后触发预加载
+let prefetchTriggered = false;
+window.addEventListener("scroll", () => {
+  if (prefetchTriggered) return;
+  const pct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+  if (pct > 0.3) {
+    prefetchTriggered = true;
+    prefetchNext();
+  }
+}, { passive: true });
+
+// ════════════════════════════════════════════════════════
+// 自动翻页（滚到底部）
+// ════════════════════════════════════════════════════════
+let autoNextLock = false;
+window.addEventListener("scroll", () => {
+  if (!NEXT_URL || autoNextLock) return;
+  const atBottom = window.scrollY + window.innerHeight >=
+                   document.documentElement.scrollHeight - 60;
+  if (atBottom) {
+    autoNextLock = true;
+    const hint = document.getElementById("autoNextHint");
+    if (hint) hint.textContent = "⏳ 正在跳转下一章…";
+    setTimeout(() => { window.location = NEXT_URL; }, 600);
+  }
+}, { passive: true });
+
+// ════════════════════════════════════════════════════════
+// 手势翻页（左右滑动）
+// ════════════════════════════════════════════════════════
+let touchStartX = 0, touchStartY = 0;
+document.addEventListener("touchstart", e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+document.addEventListener("touchend", e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  // 水平滑动超过 60px 且竖向偏移 < 40px
+  if (Math.abs(dx) > 60 && Math.abs(dy) < 40) {
+    if (dx < 0 && NEXT_ID) navTo(NEXT_ID);   // 左滑 → 下一章
+    if (dx > 0 && PREV_ID) navTo(PREV_ID);   // 右滑 → 上一章
+  }
+}, { passive: true });
+
+// ════════════════════════════════════════════════════════
+// 导航
+// ════════════════════════════════════════════════════════
+function navTo(id) {
+  if (!id) return;
+  window.location = `/read/${id}`;
+}
+
+// ════════════════════════════════════════════════════════
+// 收藏书架
+// ════════════════════════════════════════════════════════
+async function toggleShelf(bookId, addMode) {
+  const btn = document.getElementById("shelfBtn");
+  try {
+    const method = addMode ? "POST" : "DELETE";
+    const r = await fetch(`/api/shelf/${bookId}`, { method });
+    if (!r.ok) throw new Error();
+    if (addMode) {
+      btn.textContent = "★ 已收藏";
+      btn.classList.add("on-shelf");
+      btn.onclick = () => toggleShelf(bookId, false);
+      showToast("已加入书架 ★");
+    } else {
+      btn.textContent = "☆ 收藏";
+      btn.classList.remove("on-shelf");
+      btn.onclick = () => toggleShelf(bookId, true);
+      showToast("已从书架移除");
+    }
+  } catch {
+    showToast("操作失败，请重试");
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// 阅读位置记忆
+// ════════════════════════════════════════════════════════
+const POS_KEY = `rpos_${CHAPTER_ID}`;
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem(POS_KEY, window.scrollY);
+});
+// 恢复位置（但如果是从历史跳回的，直接到顶）
+window.addEventListener("load", () => {
+  const pos = sessionStorage.getItem(POS_KEY);
+  if (pos && parseInt(pos) > 100) {
+    window.scrollTo({ top: parseInt(pos), behavior: "instant" });
+  }
+});
+
+// ════════════════════════════════════════════════════════
+// 键盘快捷键（桌面端）
+// ════════════════════════════════════════════════════════
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") { if(NEXT_ID) navTo(NEXT_ID); }
+  if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   { if(PREV_ID) navTo(PREV_ID); }
+  if (e.key === "t" || e.key === "T") { openToc(); }
+  if (e.key === "Escape")              { closeAllPanels(); }
+});
+
+// ════════════════════════════════════════════════════════
+// 初始化
+// ════════════════════════════════════════════════════════
+(function init() {
+  const s = loadSettings();
+  applyReaderSettings(s);
+  _applyTheme(s.theme || localStorage.getItem("novel_theme") || "light");
+  updateProgressBar();
+})();
+</script>
+{% endblock %}

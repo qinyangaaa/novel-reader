@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}下载管理{% endblock %}
+
+{% block navbar_left %}
+<button class="navbar-btn" onclick="history.back()">←</button>
+<span class="navbar-brand">下载管理</span>
+{% endblock %}
+
+{% block content %}
+
+{% if tasks %}
+<div class="section-title">共 {{ tasks|length }} 个任务</div>
+<div style="padding:0 16px 20px;">
+  {% for t in tasks %}
+  {% set pct = ((t.done / t.total * 100) | int) if t.total > 0 else 0 %}
+  <div class="dl-task-card" id="card_{{ t.book_id }}">
+
+    <!-- 标题行 -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px;">
+      <div style="min-width:0;flex:1;">
+        <div style="font-size:0.95rem;font-weight:700;color:var(--text);
+                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          {{ t.title }}
+        </div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px;">
+          {{ t.author or '未知作者' }}
+        </div>
+      </div>
+      <span class="dl-badge dl-badge-{{ t.status }}">
+        {% if t.status == 'running' %}⏳ 下载中
+        {% elif t.status == 'paused' %}⏸ 已暂停
+        {% elif t.status == 'done' %}✅ 完成
+        {% elif t.status == 'failed' %}❌ 失败
+        {% else %}🕐 等待{% endif %}
+      </span>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="dl-bar-wrap" style="margin-bottom:6px;">
+      <div class="dl-bar" style="width:{{ pct }}%;
+           {% if t.status == 'done' %}background:#22c55e;{% endif %}"></div>
+    </div>
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;">
+      {{ t.done }} / {{ t.total }} 章 · {{ pct }}%
+      {% if t.failed > 0 %}
+        · <span style="color:#e05a45;">{{ t.failed }} 章获取失败</span>
+      {% endif %}
+    </div>
+
+    <!-- 操作按钮 -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      {% if t.status == 'running' %}
+        <button class="dl-btn dl-btn-pause"
+          onclick="taskAction({{ t.book_id }},'pause')">暂停</button>
+      {% elif t.status == 'paused' %}
+        <button class="dl-btn dl-btn-resume"
+          onclick="taskAction({{ t.book_id }},'resume')">继续</button>
+      {% endif %}
+
+      {% if t.source_url %}
+      <a href="/book?source={{ t.source }}&url={{ t.source_url|urlencode }}"
+         class="dl-btn" style="text-align:center;">查看书籍</a>
+      {% endif %}
+
+      <button class="dl-btn dl-btn-cancel"
+        onclick="taskAction({{ t.book_id }},'cancel')">删除记录</button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="icon">📥</div>
+  <p style="font-size:1rem;font-weight:600;">暂无下载任务</p>
+  <p style="margin-top:8px;font-size:0.85rem;color:var(--text-muted);">
+    在书籍页点「⬇ 一键下载全书」创建任务
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.dl-task-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.dl-badge {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dl-badge-running { background:#fef3c7; color:#d97706; }
+.dl-badge-paused  { background:#ede9fe; color:#6d28d9; }
+.dl-badge-done    { background:#dcfce7; color:#15803d; }
+.dl-badge-failed  { background:#fee2e2; color:#dc2626; }
+[data-theme="dark"] .dl-badge-running { background:#2a1f00; color:#fbbf24; }
+[data-theme="dark"] .dl-badge-paused  { background:#1e1a2e; color:#a78bfa; }
+[data-theme="dark"] .dl-badge-done    { background:#052e16; color:#4ade80; }
+[data-theme="dark"] .dl-badge-failed  { background:#2a0a0a; color:#f87171; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function taskAction(bookId, action) {
+  if (action === 'cancel' && !confirm('删除该任务记录？')) return;
+  const urlMap = {
+    cancel: `/api/download/${bookId}`,
+    pause:  `/api/download/${bookId}/pause`,
+    resume: `/api/download/${bookId}/resume`,
+  };
+  const methodMap = { cancel: 'DELETE', pause: 'POST', resume: 'POST' };
+  await fetch(urlMap[action], { method: methodMap[action] });
+  location.reload();
+}
+</script>
+{% endblock %}

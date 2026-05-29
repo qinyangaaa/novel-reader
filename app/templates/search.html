@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}{% if query %}搜索：{{ query }}{% else %}搜索小说{% endif %}{% endblock %}
+
+{% block navbar_left %}
+<button class="navbar-btn" onclick="history.back()">←</button>
+<span class="navbar-brand">搜索</span>
+{% endblock %}
+
+{% block content %}
+
+<!-- 搜索栏 -->
+<form class="search-bar" id="searchForm" action="/search" method="get" autocomplete="off">
+  <input class="search-input" type="search" name="q" id="searchInput"
+         value="{{ query }}" placeholder="输入小说名、作者名…"
+         autocorrect="off" spellcheck="false">
+  <button class="search-btn" type="submit">搜索</button>
+</form>
+
+<!-- 搜索历史 -->
+{% if history and not query %}
+<div class="history-section" id="historySection">
+  <div class="history-header">
+    <span class="section-title" style="padding:0;">搜索历史</span>
+    <button class="history-clear-btn" onclick="clearAllHistory()">清空</button>
+  </div>
+  <div class="history-tags" id="historyTags">
+    {% for kw in history %}
+    <div class="history-tag-wrap">
+      <span class="history-tag" onclick="searchKeyword('{{ kw|e }}')">{{ kw }}</span>
+      <button class="history-tag-del" onclick="deleteHistory('{{ kw|e }}', this)">×</button>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 加载中 -->
+<div class="loading" id="loadingBar" style="display:none;">
+  <div class="spinner"></div>
+  <span>正在通过 Yandex · Bing · DDG 搜索…</span>
+</div>
+
+{% if error %}
+<div class="error-box">⚠️ {{ error }}</div>
+{% endif %}
+
+{% if query %}
+  {% if total == 0 and not error %}
+  <div class="empty-state" style="padding-top:50px;">
+    <div class="icon">🔍</div>
+    <p style="font-size:1rem;font-weight:600;">没有找到「{{ query }}」</p>
+    <p style="margin-top:8px;font-size:0.82rem;color:var(--text-muted);">换个关键词试试，或稍后再搜</p>
+  </div>
+  {% else %}
+
+  <!-- 统计栏 -->
+  <div class="result-stats">
+    <span>找到 <strong>{{ total }}</strong> 个结果</span>
+    {% if elapsed %}<span class="stats-time">{{ elapsed }}s</span>{% endif %}
+  </div>
+
+  <!-- 来源 Tab -->
+  {% if grouped|length > 1 %}
+  <div class="source-tabs">
+    <a class="source-tab {% if not active_source %}active{% endif %}"
+       href="/search?q={{ query|urlencode }}">全部 ({{ total }})</a>
+    {% for src, items in grouped.items() %}
+    <a class="source-tab {% if active_source == src %}active{% endif %}"
+       href="/search?q={{ query|urlencode }}&source={{ src }}">
+      {{ source_names.get(src, src) }} ({{ items|length }})
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- 结果列表 -->
+  {% for src, items in grouped.items() %}
+    {% if grouped|length > 1 %}
+    <div class="group-header">
+      <span class="group-title">{{ source_names.get(src, src) }}</span>
+      <span class="group-count">{{ items|length }} 条</span>
+    </div>
+    {% endif %}
+    <div class="card-list">
+      {% for r in items %}
+      <a href="/book?source={{ r.source }}&url={{ r.source_url|urlencode }}"
+         style="text-decoration:none;color:inherit;">
+        <div class="card">
+          {% if r.cover %}
+            <img class="card-cover" src="{{ r.cover }}" alt="{{ r.title }}" loading="lazy"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+            <div class="card-cover-placeholder" style="display:none;">📖</div>
+          {% else %}
+            <div class="card-cover-placeholder">📖</div>
+          {% endif %}
+          <div class="card-body">
+            <div class="card-title">{{ r.title }}</div>
+            <div class="card-meta">
+              {% if r.author %}<span>{{ r.author }}</span>{% endif %}
+              <span class="card-tag">{{ source_names.get(r.source, r.source) }}</span>
+            </div>
+            {% if r.intro %}<div class="card-intro">{{ r.intro }}</div>{% endif %}
+          </div>
+          <div class="card-arrow">›</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% endfor %}
+  {% endif %}
+
+{% else %}
+<div class="empty-state" style="padding-top:{% if history %}20px{% else %}60px{% endif %};">
+  {% if not history %}
+  <div class="icon">🔍</div>
+  <p style="font-size:1rem;">输入小说名开始搜索</p>
+  <p style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);">Yandex · Bing · DuckDuckGo 三引擎聚合</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.result-stats{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px;font-size:0.82rem;color:var(--text-muted);border-bottom:1px solid var(--border);}
+.stats-time{font-size:0.78rem;}
+.source-tabs{display:flex;padding:0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;border-bottom:2px solid var(--border);background:var(--bg-card);}
+.source-tabs::-webkit-scrollbar{display:none;}
+.source-tab{flex-shrink:0;padding:10px 14px;font-size:0.85rem;color:var(--text-muted);
+  border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;}
+.source-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+.group-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;}
+.group-title{font-size:0.82rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;}
+.group-count{font-size:0.78rem;color:var(--text-muted);}
+.card-arrow{color:var(--text-muted);font-size:1.2rem;align-self:center;flex-shrink:0;margin-left:4px;}
+
+/* 搜索历史 */
+.history-section{padding:8px 16px 4px;}
+.history-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.history-clear-btn{background:none;border:none;color:var(--text-muted);font-size:0.8rem;cursor:pointer;padding:2px 6px;}
+.history-tags{display:flex;flex-wrap:wrap;gap:8px;}
+.history-tag-wrap{display:flex;align-items:center;background:var(--bg-card);
+  border:1px solid var(--border);border-radius:20px;overflow:hidden;}
+.history-tag{padding:5px 10px 5px 12px;font-size:0.85rem;cursor:pointer;color:var(--text);}
+.history-tag:active{background:var(--border);}
+.history-tag-del{padding:4px 8px;background:none;border:none;color:var(--text-muted);
+  font-size:0.9rem;cursor:pointer;line-height:1;}
+.history-tag-del:active{color:var(--accent);}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById("searchForm").addEventListener("submit", function(e) {
+  if (!document.getElementById("searchInput").value.trim()) { e.preventDefault(); return; }
+  document.getElementById("loadingBar").style.display = "flex";
+  document.getElementById("historySection")?.remove();
+});
+
+function searchKeyword(kw) {
+  document.getElementById("searchInput").value = kw;
+  document.getElementById("searchForm").submit();
+}
+
+async function deleteHistory(kw, btn) {
+  try {
+    await fetch(`/api/search-history/${encodeURIComponent(kw)}`, {method:"DELETE"});
+    btn.closest(".history-tag-wrap").remove();
+    // 如果没有历史了就隐藏区块
+    if (!document.querySelectorAll(".history-tag-wrap").length)
+      document.getElementById("historySection")?.remove();
+  } catch { showToast("删除失败"); }
+}
+
+async function clearAllHistory() {
+  if (!confirm("清空所有搜索历史？")) return;
+  await fetch("/api/search-history", {method:"DELETE"});
+  document.getElementById("historySection")?.remove();
+  showToast("已清空");
+}
+
+{% if not query %}
+document.getElementById("searchInput").focus();
+{% endif %}
+</script>
+{% endblock %}

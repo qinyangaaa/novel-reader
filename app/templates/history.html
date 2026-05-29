@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}阅读历史{% endblock %}
+
+{% block navbar_left %}
+<span class="navbar-brand">历史记录</span>
+{% endblock %}
+
+{% block content %}
+{% if records %}
+  <div class="section-title">共 {{ records|length }} 条</div>
+  <div class="card-list">
+    {% for r in records %}
+    <a href="/read/{{ r.chapter_id }}" style="text-decoration:none;color:inherit;">
+      <div class="card">
+        <div class="card-cover-placeholder">📖</div>
+        <div class="card-body">
+          <div class="card-title">{{ r.title }}</div>
+          <div class="card-meta">
+            <span>{{ r.author or '未知作者' }}</span>
+          </div>
+          <div class="card-intro" style="color:var(--accent);">▶ {{ r.chapter_title }}</div>
+          <div style="font-size:0.73rem;color:var(--text-muted);margin-top:2px;">{{ r.read_time }}</div>
+        </div>
+        <div style="color:var(--text-muted);font-size:1.2rem;align-self:center;flex-shrink:0;">›</div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">
+    <div class="icon">🕐</div>
+    <p style="font-size:1rem;font-weight:600;">暂无阅读历史</p>
+    <p style="margin-top:8px;font-size:0.85rem;">开始阅读后会在这里显示</p>
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} - 目录{% endblock %}
+
+{% block navbar_left %}
+<button class="navbar-btn" onclick="history.back()">←</button>
+<span class="navbar-brand" style="font-size:0.92rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:160px;">
+  {{ book.title|truncate(18,true,'…') }}
+</span>
+{% endblock %}
+
+{% block content %}
+
+<!-- 书籍信息头 -->
+<div class="book-header">
+  {% if book.cover %}
+    <img class="book-cover" src="{{ book.cover }}" alt="{{ book.title }}"
+         onerror="this.style.display='none'">
+  {% else %}
+    <div class="book-cover" style="display:flex;align-items:center;justify-content:center;font-size:2.2rem;background:var(--border);">📖</div>
+  {% endif %}
+  <div class="book-info">
+    <div class="book-title">{{ book.title }}</div>
+    <div class="book-author">
+      {{ book.author or '未知作者' }}
+      <span class="card-tag" style="margin-left:6px;">{{ source }}</span>
+    </div>
+    {% if book.intro %}<div class="book-intro">{{ book.intro }}</div>{% endif %}
+  </div>
+</div>
+
+<!-- 继续阅读 -->
+{% if history %}
+<div class="resume-banner">
+  <div class="resume-text">📌 上次读到：{{ history.chapter_title or history.chapter_id }}</div>
+  <button class="resume-btn" onclick="window.location='/read/{{ history.chapter_id }}'">继续阅读</button>
+</div>
+{% endif %}
+
+<!-- 工具栏 -->
+<div class="toolbar">
+  <button class="toolbar-btn shelf-btn {% if on_shelf %}on-shelf{% endif %}"
+          id="shelfBtn" onclick="toggleShelf({{ book.id }}, {{ 'false' if on_shelf else 'true' }})">
+    {% if on_shelf %}★ 已收藏{% else %}☆ 收藏{% endif %}
+  </button>
+  <button class="toolbar-btn" onclick="openSwitchSource()" title="在其他网站找同一本书">
+    🔄 换源
+  </button>
+  <button class="toolbar-btn"
+    onclick="window.location='/book?source={{ source }}&url={{ book.source_url|urlencode }}&refresh=1'">
+    ↻ 刷新
+  </button>
+  <button class="toolbar-btn" id="sortBtn" onclick="toggleSort()">↕ 正序</button>
+</div>
+
+<!-- 下载卡片 -->
+<div class="dl-card" id="dlCard">
+  <div class="dl-info">
+    <span class="dl-label">📥 离线缓存</span>
+    <span class="dl-count" id="dlCount">
+      已缓存 {{ cached_count }} / {{ chapters|length }} 章
+    </span>
+  </div>
+  <div class="dl-bar-wrap">
+    <div class="dl-bar" id="dlBar"
+         style="width:{% if chapters|length > 0 %}{{ (cached_count / chapters|length * 100)|int }}{% else %}0{% endif %}%"></div>
+  </div>
+  <div class="dl-actions" id="dlActions">
+    {% if dl_task and dl_task.status == 'running' %}
+      <span class="dl-status running">⏳ 下载中 {{ dl_task.done }}/{{ dl_task.total }}</span>
+      <button class="dl-btn dl-btn-pause" onclick="dlPause()">暂停</button>
+    {% elif dl_task and dl_task.status == 'paused' %}
+      <span class="dl-status paused">⏸ 已暂停 {{ dl_task.done }}/{{ dl_task.total }}</span>
+      <button class="dl-btn dl-btn-resume" onclick="dlResume()">继续</button>
+      <button class="dl-btn dl-btn-cancel" onclick="dlCancel()">取消</button>
+    {% elif dl_task and dl_task.status == 'done' %}
+      <span class="dl-status done">✅ 已全部缓存</span>
+      <button class="dl-btn dl-btn-cancel" onclick="dlCancel()">清除</button>
+    {% else %}
+      <button class="dl-btn dl-btn-start" onclick="dlStart()">⬇ 一键下载全书</button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="section-title" style="margin-top:4px;">共 {{ chapters|length }} 章</div>
+
+<!-- 章节列表 -->
+<div class="chapter-list" id="chapterList">
+  {% if chapters %}
+    {% for c in chapters %}
+    <a class="chapter-item {% if history and c.id == history.chapter_id %}current-chapter{% endif %}"
+       href="/read/{{ c.id }}">
+      <span class="chapter-num">{{ loop.index }}</span>
+      <span class="chapter-title-text">{{ c.title }}</span>
+    </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state"><div class="icon">😅</div><p>暂无章节，点刷新重试</p></div>
+  {% endif %}
+</div>
+
+<!-- 换源弹窗 -->
+<div class="overlay" id="switchOverlay" onclick="closeSwitchSource()"></div>
+<div class="switch-panel" id="switchPanel">
+  <div class="toc-header">
+    <span class="toc-header-title">换源 — {{ book.title }}</span>
+    <button class="toc-close" onclick="closeSwitchSource()">✕</button>
+  </div>
+  <div id="switchBody" style="padding:16px;text-align:center;color:var(--text-muted);">
+    <div class="spinner" style="margin:0 auto 12px;"></div>
+    搜索其他来源中…
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}{% endblock %}
+
+{% block extra_js %}
+<script>
+const BOOK_ID    = {{ book.id }};
+const BOOK_TITLE = {{ book.title | tojson }};
+const TOTAL_CH   = {{ chapters|length }};
+
+// 滚动到当前章节
+window.addEventListener("load", () => {
+  document.querySelector(".current-chapter")
+    ?.scrollIntoView({block:"center", behavior:"smooth"});
+});
+
+// 排序
+let isReversed = false;
+function toggleSort() {
+  const list  = document.getElementById("chapterList");
+  const items = [...list.querySelectorAll("a.chapter-item")];
+  isReversed  = !isReversed;
+  document.getElementById("sortBtn").textContent = isReversed ? "↕ 倒序" : "↕ 正序";
+  items.reverse().forEach(i => list.appendChild(i));
+}
+
+// 收藏
+async function toggleShelf(id, add) {
+  const btn = document.getElementById("shelfBtn");
+  await fetch(`/api/shelf/${id}`, {method: add ? "POST" : "DELETE"});
+  if (add) {
+    btn.textContent = "★ 已收藏"; btn.classList.add("on-shelf");
+    btn.onclick = () => toggleShelf(id, false);
+  } else {
+    btn.textContent = "☆ 收藏"; btn.classList.remove("on-shelf");
+    btn.onclick = () => toggleShelf(id, true);
+  }
+  showToast(add ? "已加入书架 ★" : "已移出书架");
+}
+
+// ── 下载控制 ───────────────────────────────────────────────────
+let _dlTimer = null;
+
+async function dlStart() {
+  const r = await fetch(`/api/download/${BOOK_ID}`, {method:"POST"});
+  const d = await r.json();
+  updateDlUI(d);
+  startPolling();
+  showToast("开始下载，后台运行中…");
+}
+async function dlPause() {
+  const r = await fetch(`/api/download/${BOOK_ID}/pause`, {method:"POST"});
+  updateDlUI(await r.json());
+  stopPolling();
+}
+async function dlResume() {
+  const r = await fetch(`/api/download/${BOOK_ID}/resume`, {method:"POST"});
+  updateDlUI(await r.json());
+  startPolling();
+}
+async function dlCancel() {
+  await fetch(`/api/download/${BOOK_ID}`, {method:"DELETE"});
+  stopPolling();
+  document.getElementById("dlActions").innerHTML =
+    `<button class="dl-btn dl-btn-start" onclick="dlStart()">⬇ 一键下载全书</button>`;
+  showToast("已取消下载");
+}
+
+function updateDlUI(task) {
+  if (!task || task.status === "none") return;
+  const done  = task.done  || 0;
+  const total = task.total || TOTAL_CH;
+  const pct   = total > 0 ? Math.round(done / total * 100) : 0;
+
+  document.getElementById("dlBar").style.width   = pct + "%";
+  document.getElementById("dlCount").textContent = `已缓存 ${done} / ${total} 章`;
+
+  const acts = document.getElementById("dlActions");
+  if (task.status === "running") {
+    acts.innerHTML = `
+      <span class="dl-status running">⏳ 下载中 ${done}/${total}</span>
+      <button class="dl-btn dl-btn-pause" onclick="dlPause()">暂停</button>`;
+  } else if (task.status === "paused") {
+    acts.innerHTML = `
+      <span class="dl-status paused">⏸ 已暂停 ${done}/${total}</span>
+      <button class="dl-btn dl-btn-resume" onclick="dlResume()">继续</button>
+      <button class="dl-btn dl-btn-cancel" onclick="dlCancel()">取消</button>`;
+  } else if (task.status === "done") {
+    acts.innerHTML = `
+      <span class="dl-status done">✅ 已全部缓存</span>
+      <button class="dl-btn dl-btn-cancel" onclick="dlCancel()">清除</button>`;
+    stopPolling();
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  _dlTimer = setInterval(async () => {
+    const r = await fetch(`/api/download/${BOOK_ID}`);
+    const d = await r.json();
+    updateDlUI(d);
+    if (d.status === "done" || d.status === "failed") stopPolling();
+  }, 2000);
+}
+function stopPolling() {
+  if (_dlTimer) { clearInterval(_dlTimer); _dlTimer = null; }
+}
+
+// 如果页面加载时任务正在运行，自动开始轮询
+{% if dl_task and dl_task.status == 'running' %}
+startPolling();
+{% endif %}
+
+// ── 换源 ────────────────────────────────────────────────────────
+function openSwitchSource() {
+  document.getElementById("switchPanel").classList.add("open");
+  document.getElementById("switchOverlay").classList.add("open");
+  loadSwitchSources();
+}
+function closeSwitchSource() {
+  document.getElementById("switchPanel").classList.remove("open");
+  document.getElementById("switchOverlay").classList.remove("open");
+}
+
+let switchLoaded = false;
+async function loadSwitchSources() {
+  if (switchLoaded) return;
+  try {
+    const r = await fetch(
+      `/api/switch-source?book_id=${BOOK_ID}&title=${encodeURIComponent(BOOK_TITLE)}`
+    );
+    const d = await r.json();
+    renderSwitchSources(d.results);
+    switchLoaded = true;
+  } catch(e) {
+    document.getElementById("switchBody").innerHTML =
+      `<div style="padding:20px;text-align:center;color:var(--text-muted);">加载失败，请重试</div>`;
+  }
+}
+
+function renderSwitchSources(results) {
+  const body = document.getElementById("switchBody");
+  if (!results.length) {
+    body.innerHTML = `<div style="padding:30px;text-align:center;color:var(--text-muted);">
+      没有找到其他来源</div>`;
+    return;
+  }
+  body.innerHTML = results.map(r => `
+    <div class="switch-item"
+         onclick="window.location='/book?source=${encodeURIComponent(r.source)}&url=${encodeURIComponent(r.source_url)}'">
+      <div class="switch-item-info">
+        <div class="switch-item-title">${escHtml(r.title)}</div>
+        <div class="switch-item-meta">
+          ${r.author ? escHtml(r.author) + ' · ' : ''}
+          <span class="card-tag">${escHtml(r.source)}</span>
+        </div>
+        ${r.intro ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:3px;
+          overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;">
+          ${escHtml(r.intro)}</div>` : ''}
+      </div>
+      <button class="switch-item-btn">切换</button>
+    </div>`).join("");
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}小说阅读器{% endblock %}
+
+{% block content %}
+
+<!-- 顶部搜索入口 -->
+<div style="padding:16px 16px 8px;">
+  <form action="/search" method="get" id="homeForm">
+    <div style="display:flex;gap:8px;">
+      <input class="search-input" type="search" name="q" id="homeQ"
+             placeholder="搜索小说名、作者…"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="search-btn" type="submit">搜索</button>
+    </div>
+  </form>
+  <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+    <span class="engine-badge">🌐 Yandex</span>
+    <span class="engine-badge">🔵 Bing</span>
+    <span class="engine-badge">🦆 DuckDuckGo</span>
+  </div>
+</div>
+
+<!-- 搜索 loading -->
+<div class="loading" id="searchLoading" style="display:none;">
+  <div class="spinner"></div><span>搜索中…</span>
+</div>
+
+<!-- 继续阅读 -->
+{% if records %}
+<div class="section-title" style="margin-top:4px;">继续阅读</div>
+<div class="card-list">
+  {% for r in records[:5] %}
+  <a href="/read/{{ r.chapter_id }}" style="text-decoration:none;color:inherit;">
+    <div class="card">
+      <div class="card-cover-placeholder">📖</div>
+      <div class="card-body">
+        <div class="card-title">{{ r.title }}</div>
+        <div class="card-meta">
+          <span>{{ r.author or '未知作者' }}</span>
+        </div>
+        <div class="card-intro" style="color:var(--accent);">▶ {{ r.chapter_title }}</div>
+        <div style="font-size:0.73rem;color:var(--text-muted);margin-top:2px;">{{ r.read_time }}</div>
+      </div>
+      <div style="color:var(--text-muted);font-size:1.2rem;align-self:center;flex-shrink:0;">›</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% if records|length > 5 %}
+<div style="text-align:center;padding:8px 0 4px;">
+  <a href="/history" style="font-size:0.85rem;color:var(--text-muted);">查看全部历史 →</a>
+</div>
+{% endif %}
+
+{% else %}
+<!-- 空态引导 -->
+<div class="empty-state" style="padding-top:44px;">
+  <div class="icon">📚</div>
+  <p style="font-size:1rem;font-weight:600;color:var(--text);">欢迎使用小说阅读器</p>
+  <p style="margin-top:8px;font-size:0.85rem;">搜索小说名，开始阅读</p>
+  <p style="margin-top:24px;">
+    <a href="/search" class="search-btn"
+       style="display:inline-block;padding:11px 28px;border-radius:24px;font-size:0.95rem;">
+      立即搜索
+    </a>
+  </p>
+  <p style="margin-top:16px;font-size:0.75rem;color:var(--text-muted);">
+    <a href="/debug/engines" style="color:var(--text-muted);">引擎诊断</a>
+  </p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.engine-badge {
+  font-size: 0.73rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 9px;
+  color: var(--text-muted);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById("homeForm").addEventListener("submit", function(e) {
+  if (!document.getElementById("homeQ").value.trim()) { e.preventDefault(); return; }
+  document.getElementById("searchLoading").style.display = "flex";
+});
+</script>
+{% endblock %}

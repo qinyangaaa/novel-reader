@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}我的书架{% endblock %}
+
+{% block navbar_left %}
+<button class="navbar-btn" onclick="window.location='/'">←</button>
+<span class="navbar-brand">我的书架</span>
+{% endblock %}
+
+{% block content %}
+
+{% if books %}
+  <div class="section-title">共 {{ books|length }} 本</div>
+  <div class="card-list">
+    {% for b in books %}
+    <div class="card" style="position:relative;">
+
+      {# 封面 #}
+      <a href="/book?source={{ b.source }}&url={{ b.source_url|urlencode }}"
+         style="display:contents;">
+        {% if b.cover %}
+          <img class="card-cover" src="{{ b.cover }}" alt="{{ b.title }}"
+               loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="card-cover-placeholder" style="display:none;">📖</div>
+        {% else %}
+          <div class="card-cover-placeholder">📖</div>
+        {% endif %}
+      </a>
+
+      {# 信息 #}
+      <a href="{% if b.last_chapter_id %}/read/{{ b.last_chapter_id }}{% else %}/book?source={{ b.source }}&url={{ b.source_url|urlencode }}{% endif %}"
+         style="flex:1;min-width:0;text-decoration:none;color:inherit;">
+        <div class="card-body">
+          <div class="card-title">{{ b.title }}</div>
+          <div class="card-meta">
+            <span>{{ b.author or '未知作者' }}</span>
+            <span class="card-tag">{{ b.source }}</span>
+          </div>
+          {% if b.last_chapter_title %}
+          <div class="card-intro" style="color:var(--accent);font-size:0.82rem;">
+            ▶ {{ b.last_chapter_title }}
+          </div>
+          {% else %}
+          <div class="card-intro">尚未开始阅读</div>
+          {% endif %}
+          {% if b.read_time %}
+          <div style="font-size:0.73rem;color:var(--text-muted);margin-top:3px;">
+            {{ b.read_time }}
+          </div>
+          {% endif %}
+        </div>
+      </a>
+
+      {# 移除按钮 #}
+      <button class="shelf-remove-btn" onclick="removeShelf({{ b.book_id }}, this)"
+              title="移出书架">✕</button>
+
+    </div>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <div class="shelf-empty">
+    <div class="icon">📚</div>
+    <p style="font-size:1rem;font-weight:600;">书架空空如也</p>
+    <p style="margin-top:8px;font-size:0.85rem;">
+      在阅读页或书籍详情页点 ☆ 收藏 加入书架
+    </p>
+    <div style="margin-top:24px;">
+      <a href="/search" class="search-btn" style="display:inline-block;padding:10px 24px;border-radius:24px;">
+        去搜索小说
+      </a>
+    </div>
+  </div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.shelf-remove-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.12);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+  transition: background 0.2s;
+}
+.shelf-remove-btn:active { background: rgba(220,50,50,0.25); color: #e05a45; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function removeShelf(bookId, btn) {
+  try {
+    const r = await fetch(`/api/shelf/${bookId}`, { method: "DELETE" });
+    if (!r.ok) throw new Error();
+    // 淡出移除卡片
+    const card = btn.closest(".card");
+    card.style.transition = "opacity 0.3s, transform 0.3s";
+    card.style.opacity = "0";
+    card.style.transform = "translateX(20px)";
+    setTimeout(() => {
+      card.remove();
+      // 如果书架空了就刷新显示空态
+      const remaining = document.querySelectorAll(".card").length;
+      if (remaining === 0) location.reload();
+    }, 300);
+    showToast("已移出书架");
+  } catch {
+    showToast("操作失败，请重试");
+  }
+}
+</script>
+{% endblock %}
